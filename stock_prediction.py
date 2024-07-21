@@ -1,58 +1,60 @@
-class StockTrader:
-    def __init__(self):
-        self.money = 100.0
-        self.portfolio = {}
-        self.price_history = {}
+from __future__ import division
+from math import sqrt
+import heapq
 
-    def read_input(self):
-        import sys
-        input = sys.stdin.read
-        data = input().strip().split('\n')
-        
-        m, k, d = map(float, data[0].split())
-        stocks = []
-        
-        for i in range(1, int(k) + 1):
-            line = data[i].split()
-            name = line[0]
-            owned = int(line[1])
-            prices = list(map(float, line[2:]))
-            stocks.append((name, owned, prices))
-        
-        return m, k, d, stocks
+def printTransactions(money, k, d, names, owned, prices):
+    def mean(nums):
+        return sum(nums) / len(nums)
 
-    def decide_transactions(self, m, k, d, stocks):
-        transactions = []
+    def sd(nums):
+        average = mean(nums)
+        return sqrt(sum([(x - average) ** 2 for x in nums]) / len(nums))
+
+    def info(price):
+        # Simplified and improved info function
+        cc = sum(1 for i in range(1, 5) if price[i] > price[i - 1])
+        sigma = sd(price)
+        mu = mean(price)
+        c1, c2, c3 = mean(price[0:3]), mean(price[1:4]), mean(price[2:5])
         
-        for name, owned, prices in stocks:
-            if name not in self.price_history:
-                self.price_history[name] = prices
-            else:
-                self.price_history[name] = self.price_history[name][1:] + [prices[-1]]
-            
-            sma = sum(prices) / len(prices)
-            current_price = prices[-1]
-            
-            if current_price < sma and self.money >= current_price:
-                shares_to_buy = int(self.money // current_price)
-                self.money -= shares_to_buy * current_price
-                self.portfolio[name] = self.portfolio.get(name, 0) + shares_to_buy
-                transactions.append((name, "BUY", shares_to_buy))
-            elif current_price > sma and owned > 0:
-                self.money += owned * current_price
-                transactions.append((name, "SELL", owned))
-                self.portfolio[name] = 0
+        # Return a metric to decide buying or selling
+        return (price[-1] - price[-2]) / price[-2]
+    
+    res = []
+    drop = []
+    
+    for i in range(k):
+        cur_info = info(prices[i])
+        if cur_info > 0 and owned[i] > 0:
+            res.append((names[i], 'SELL', str(owned[i])))
+        elif cur_info < 0:
+            heapq.heappush(drop, (cur_info, i, names[i]))
+    
+    while money > 0.0 and drop:
+        rate, idx, n = heapq.heappop(drop)
+        amount = int(money / prices[idx][-1])
+        if amount > 0:
+            res.append((n, 'BUY', str(amount)))
+            money -= amount * prices[idx][-1]
+    
+    print(len(res))
+    for r in res:
+        print(' '.join(r))
+    
+if __name__ == '__main__':
+    import sys
+    input = sys.stdin.read
+    data = input().strip().split('\n')
+    m, k, d = map(float, data[0].strip().split())
+    k = int(k)
+    d = int(d)
+    names = []
+    owned = []
+    prices = []
+    for i in range(1, k + 1):
+        temp = data[i].strip().split()
+        names.append(temp[0])
+        owned.append(int(temp[1]))
+        prices.append([float(x) for x in temp[2:7]])
 
-        return transactions
-
-    def play_turn(self):
-        m, k, d, stocks = self.read_input()
-        transactions = self.decide_transactions(m, k, d, stocks)
-        
-        print(len(transactions))
-        for t in transactions:
-            print(t[0], t[1], t[2])
-
-if __name__ == "__main__":
-    trader = StockTrader()
-    trader.play_turn()
+    printTransactions(m, k, d, names, owned, prices)
